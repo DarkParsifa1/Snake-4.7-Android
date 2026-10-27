@@ -1,59 +1,67 @@
-
 name: Build Snake APK
 
 on:
-  workflow_dispatch:
-  push:
-    branches: [ main ]
+workflow_dispatch:
+push:
+branches:
+- main
 
 permissions:
-  contents: read
+contents: read
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+build:
+runs-on: ubuntu-latest
+steps:
+- name: Checkout repository
+uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+  - name: Set up Java
+    uses: actions/setup-java@v4
+    with:
+      distribution: temurin
+      java-version: '17'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
+  - name: Set up Gradle
+    uses: gradle/actions/setup-gradle@v4
+    with:
+      gradle-version: '8.9'
 
-     - name: Extract project ZIP
+  - name: Find and extract ZIP
+    shell: bash
     run: |
-      mkdir -p unpacked
       ZIP_FILE="$(find . -type f -iname '*Snake*4.7*.zip' -print -quit)"
       if [ -z "$ZIP_FILE" ]; then
-        echo "ZIP archive not found. Files in repository:"
-        find . -maxdepth 3 -type f -print
+        echo "ZIP archive not found"
+        find . -maxdepth 4 -type f -print
         exit 1
       fi
-      echo "Found archive: $ZIP_FILE"
+      echo "Found: $ZIP_FILE"
+      mkdir -p unpacked
       unzip -o "$ZIP_FILE" -d unpacked
-      echo "Gradle files:"
       find unpacked -name build.gradle -print
 
-      - name: Build APK
-        run: |
-          PROJECT="$(find unpacked -type f -path '*/android/app/build.gradle' -print -quit)"
-          if [ -z "$PROJECT" ]; then
-            echo "Android project not found in ZIP"
-            exit 1
-          fi
-          ANDROID_DIR="$(dirname "$(dirname "$PROJECT")")"
-          gradle -p "$ANDROID_DIR" :app:assembleDebug
+  - name: Build APK
+    shell: bash
+    run: |
+      PROJECT="$(find unpacked -type f -path '*/android/app/build.gradle' -print -quit)"
+      if [ -z "$PROJECT" ]; then
+        echo "Android project not found"
+        find unpacked -maxdepth 6 -type f -print
+        exit 1
+      fi
+      ANDROID_DIR="$(dirname "$(dirname "$PROJECT")")"
+      gradle -p "$ANDROID_DIR" :app:assembleDebug
+      APK="$(find unpacked -type f -path '*/app/build/outputs/apk/debug/*.apk' -print -quit)"
+      if [ -z "$APK" ]; then
+        echo "APK was not created"
+        exit 1
+      fi
+      echo "APK_PATH=$APK" >> "$GITHUB_ENV"
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Snake-APK
-          path: unpacked/**/android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+  - name: Upload APK
+    uses: actions/upload-artifact@v4
+    with:
+      name: Snake-APK
+      path: ${{ env.APK_PATH }}
+      if-no-files-found: error
