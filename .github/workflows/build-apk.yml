@@ -27,11 +27,19 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Extract project ZIP
-        run: |
-          mkdir -p unpacked
-          unzip -o Snake-4.7-Cloud-Build.zip -d unpacked
-          find unpacked -name build.gradle -print
+     - name: Extract project ZIP
+    run: |
+      mkdir -p unpacked
+      ZIP_FILE="$(find . -type f -iname '*Snake*4.7*.zip' -print -quit)"
+      if [ -z "$ZIP_FILE" ]; then
+        echo "ZIP archive not found. Files in repository:"
+        find . -maxdepth 3 -type f -print
+        exit 1
+      fi
+      echo "Found archive: $ZIP_FILE"
+      unzip -o "$ZIP_FILE" -d unpacked
+      echo "Gradle files:"
+      find unpacked -name build.gradle -print
 
       - name: Build APK
         run: |
